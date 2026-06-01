@@ -44,7 +44,7 @@ The system will boot instantly with Python 3.10, the virtual environment pre-con
 
 ---
 
-### 🛠️ Core Technical Enhancements Implemented (`lucid_cnn.py` vs `lucid_cnn1.py`)
+### 🛠️ Core Technical Enhancements Implemented (`lucid_cnn.py`)
 
 #### 1. Docker Environment & M1/M2 Mac Compatibility Patch (Forced CPU Fallback)
 * **Original Code (`lucid_cnn1.py`):** Tried to dynamically allocate GPU memory, which explicitly triggers system core dumps and allocation crashes inside emulated container layers on ARM64 architectures:
