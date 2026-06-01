@@ -52,7 +52,7 @@ tf.random.set_seed(SEED)
 K.set_image_data_format('channels_last')
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 #tf.config.experimental.set_memory_growth(tf.config.list_physical_devices('GPU')[0], True)   # dynamically grow the memory used on the GPU
-# تعطيل الـ GPU
+# Disabling the GPU
 tf.config.set_visible_devices([], 'GPU')
 
 #config.log_device_placement = True  # to log device placement (on which device the operation ran)
