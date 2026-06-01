@@ -13,7 +13,7 @@ To bypass these hardware constraints and establish a rock-solid dev environment,
 
 1. **Architecture Emulation:** A dedicated Docker container was deployed, forcing the emulation of the required target platform to provide a stable, fully compatible Ubuntu 22.04 environment:
    ```bash
-   docker run --rm -it --privileged --platform linux/amd64 p4-dev /bin/bash
+   docker run --rm -it --privileged --platform linux/amd64 ubuntu:22.04 /bin/bash
    ```
 2. **Environment Isolation:** A clean Python virtual environment (`venv`) was initialized inside the container to isolate dependencies and mitigate software library conflicts:
    ```bash
@@ -28,6 +28,19 @@ To bypass these hardware constraints and establish a rock-solid dev environment,
    ```bash
    docker commit <container_id> p4-dev
    ```
+
+### 🐳 Automated Deployment via Dockerfile
+While the initial environment troubleshooting was performed interactively, we have fully automated this entire deployment pipeline into a single, production-ready `Dockerfile` provided in this repository. 
+
+To build and launch the environment on Apple Silicon without manual dependency installation, simply run:
+```bash
+# 1. Build the cross-platform container image
+docker build --platform linux/amd64 -t p4-dev-image .
+
+# 2. Launch the isolated development workspace
+docker run --rm -it --privileged --platform linux/amd64 p4-dev-image /bin/bash
+```
+The system will boot instantly with Python 3.10, the virtual environment pre-configured, and TensorFlow successfully pinned to the environment path.
 
 ---
 
@@ -80,11 +93,31 @@ Refactored the model's entire runtime logging and error-handling interface into 
 
 ### 🔧 Compiler & Dependency Patches (External Submodules)
 
-1. **Compiler Build Automation Fix (`p4c` TC Backend):**
-   Patched `/app/p4c/backends/tc/CMakeLists.txt` by commenting out external repository fetching (`# fetchcontent_makeavailable(iproute2repo)`). This guarantees seamless, offline-compatible compilation using localized system libraries, preventing environment building from hanging.
+* **Compiler Build Automation Fix (`p4c` TC Backend):**  
+  Patched `/app/p4c/backends/tc/CMakeLists.txt` by commenting out external repository fetching (`# fetchcontent_makeavailable(iproute2repo)`). This guarantees seamless, offline-compatible compilation using localized system libraries, preventing environment building from hanging.
+  
+* **Runtime Dependency Routing (`p4_util.py`):**  
+  Fixed critical missing execution paths and runtime import exceptions by explicitly appending system directories for `bm_runtime` and `bmpy_utils` via `sys.path.append()`.
 
-2. **Runtime Dependency Routing (`p4_util.py`):**
-   Fixed critical missing execution paths and runtime import exceptions by explicitly appending system directories for `bm_runtime` and `bmpy_utils` via `sys.path`.
+---
+
+### Quick Start: Training & Testing the Model
+
+Once inside your containerized environment, you can evaluate the optimized scripts using the following standard execution workflow:
+
+#### 1. Multi-Class CNN Model Training:
+To start the training process and export the validated network weights into your dataset path, run:
+```bash
+python3 lucid_cnn.py --train ./sample-dataset/ --epochs 100
+```
+
+#### 2. Attack Evaluation & Prediction:
+To verify the intrusion detection accuracy against pre-processed evaluation logs, run:
+```bash
+python3 lucid_cnn.py --predict ./sample-dataset/ --model ./sample-dataset/latest_model.h5
+```
+
+> **Note:** The customized runtime paths embedded within `p4_util.py` will automatically intercept execution targets and route standard Python API objects smoothly to your local compiled behavioral model tools (`/app/behavioral-model/tools`).
 
 ---
 
