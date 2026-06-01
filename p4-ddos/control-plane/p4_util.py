@@ -1,9 +1,11 @@
 import sys
 import json
+sys.path.append('/app/behavioral-model/tools')
 import bmpy_utils as utils
 from collections import OrderedDict
 
 from bm_runtime.standard import Standard
+sys.path.append('/app/behavioral-model/tools/bm_runtime')
 from bm_runtime.standard.ttypes import *
 try:
     from bm_runtime.simple_pre import SimplePre
