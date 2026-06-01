@@ -27,6 +27,7 @@ import random as rn
 import os
 from util_functions import *
 import p4_util
+import glob
 
 # Seed Random Numbers
 os.environ['PYTHONHASHSEED']=str(SEED)
@@ -36,7 +37,8 @@ config = tf.compat.v1.ConfigProto(inter_op_parallelism_threads=1)
 
 from itertools import cycle
 from tensorflow.keras import regularizers
-from tensorflow.keras.optimizers.legacy import Adam
+from tensorflow.keras.optimizers import Adam
+
 from tensorflow.keras.optimizers import SGD
 from tensorflow.keras.layers import Input, Dense, Activation, ZeroPadding2D, BatchNormalization, Flatten, Conv2D, Conv1D, LSTM, Reshape
 from tensorflow.keras.layers import AveragePooling2D, MaxPooling2D, Dropout, GlobalMaxPooling2D, GlobalAveragePooling2D
@@ -49,7 +51,10 @@ import tensorflow.keras.backend as K
 tf.random.set_seed(SEED)
 K.set_image_data_format('channels_last')
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
-config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
+#tf.config.experimental.set_memory_growth(tf.config.list_physical_devices('GPU')[0], True)   # dynamically grow the memory used on the GPU
+# تعطيل الـ GPU
+tf.config.set_visible_devices([], 'GPU')
+
 #config.log_device_placement = True  # to log device placement (on which device the operation ran)
 
 MODEL_NAME_LEN = 10
@@ -81,7 +86,7 @@ def Conv2DModel(model_name, input_shape,kernels,kernel_rows,kernel_col,pool_heig
     if dropout != None and type(dropout) == float:
         model.add(Dropout(dropout))
     model.add(Activation('relu'))
-    current_shape = model.layers[0].output_shape
+    current_shape = model.layers[0].output.shape
     current_rows = current_shape[1]
     current_cols = current_shape[2]
     current_channels = current_shape[3]
@@ -97,18 +102,37 @@ def Conv2DModel(model_name, input_shape,kernels,kernel_rows,kernel_col,pool_heig
     pool_size = (min(pool_height, current_rows), min(3, current_cols))
     model.add(MaxPooling2D(pool_size=pool_size, name='mp0'))
     model.add(Flatten())
-    model.add(Dense(1, activation='sigmoid', name='fc1'))
+    model.add(Dense(2, activation='sigmoid', name='fc1'))
 
     print(model.summary())
     return model
 
 def compileModel(model,lr):
     # optimizer = SGD(lr=lr, momentum=0.0, decay=0.0, nesterov=False)
-    optimizer = Adam(lr=lr, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
-    model.compile(loss='binary_crossentropy', optimizer=optimizer,metrics=['accuracy'])  # here we specify the loss function
+    optimizer = Adam(learning_rate=lr, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
+    model.compile(loss="categorical_crossentropy", optimizer="adam", metrics=["accuracy"])
 
 def trainingEpoch(model, batch_size, parameters, X_train,Y_train,X_val,Y_val, output_file):
     tt0 = time.time()
+    # Ensure data is formatted as NumPy arrays with correct data types
+    X_train = np.array(X_train, dtype=np.float32)
+    Y_train = np.array(Y_train, dtype=np.int32)  # For multi-class classification, use np.float32 with one-hot encoding
+
+    X_val = np.array(X_val, dtype=np.float32)
+    Y_val = np.array(Y_val, dtype=np.int32)
+
+# Print shapes to verify dimensions before passing data to the model
+    print(f"✅ X_train shape: {X_train.shape}, Y_train shape: {Y_train.shape}")
+    print(f"✅ X_val shape: {X_val.shape}, Y_val shape: {Y_val.shape}")
+    from tensorflow.keras.utils import to_categorical
+
+# Transform labels into multi-class One-Hot Encoding format
+    num_classes = len(set(Y_train))  # Calculate the number of unique target classes
+    Y_train = to_categorical(Y_train, num_classes)
+    Y_val = to_categorical(Y_val, num_classes)
+# Print updated dimensions after applying one-hot encoding
+    print(f"🔄 After encoding - Y_train shape: {Y_train.shape}, Y_val shape: {Y_val.shape}")
+
     history = model.fit(x=X_train, y=Y_train, validation_data=(X_val, Y_val), epochs=1, batch_size=batch_size, verbose=2, callbacks=[])  # TODO: verify which callbacks can be useful here (https://keras.io/callbacks/)
     tt1 = time.time()
 
@@ -132,6 +156,11 @@ def trainingEpoch(model, batch_size, parameters, X_train,Y_train,X_val,Y_val, ou
     return loss_val, accuracy_val
 
 def trainCNNModels(model_name, epochs, X_train, Y_train,X_val, Y_val, dataset_folder, time_window, max_flow_len,regularization=None, dropout=None):
+
+    print(f"X_train shape: {X_train.shape if X_train is not None else 'None'}")
+    print(f"Y_train shape: {Y_train.shape if Y_train is not None else 'None'}")
+    print(f"X_val shape: {X_val.shape if X_val is not None else 'None'}")
+    print(f"Y_val shape: {Y_val.shape if Y_val is not None else 'None'}")
 
     packets = X_train.shape[1]
     features = X_train.shape[2]
@@ -184,7 +213,10 @@ def trainCNNModels(model_name, epochs, X_train, Y_train,X_val, Y_val, dataset_fo
                                         Y_pred_val = (best_model.predict(X_val) > 0.5)
                                         tp1 = time.time()
                                         Y_true_val = Y_val.reshape((Y_val.shape[0], 1))
+                                        Y_pred_val = np.argmax(Y_pred_val, axis=1) if Y_pred_val.shape[1] > 1 else (Y_pred_val > 0.5).astype(int)
+                                        Y_true_val = np.argmax(Y_true_val, axis=1) if Y_true_val.shape[1] > 1 else Y_true_val
                                         acc_score_val = accuracy_score(Y_true_val, Y_pred_val)
+
                                         ppv_score_val = precision_score(Y_true_val, Y_pred_val)
                                         f1_score_val = f1_score(Y_true_val, Y_pred_val)
                                         tn, fp, fn, tp = confusion_matrix(Y_true_val, Y_pred_val, labels=[0, 1]).ravel()
@@ -216,12 +248,17 @@ def trainCNNModels(model_name, epochs, X_train, Y_train,X_val, Y_val, dataset_fo
                                                 model_stats_file.flush()
                                                 model_stats_file.close()
                                                 best_f1_score = f1_score_val
-                                            except:
-                                                print("An exception occurred when saving the model!")
+                                                print(f"✅ Best model saved to: {filename}.h5")
+                                            except Exception as e:
+                                                print(f"⚠️ Error occurred while saving the model: {e}")
+                                        best_model.save(dataset_folder + "latest_model.h5")
+                                        print(f"✅ Latest model saved to: {dataset_folder}latest_model.h5")
                                         del best_model
-
+                                    model.save(dataset_folder + model_name + ".h5")
+                                    print(f"✅ Model successfully saved to: {dataset_folder + model_name}.h5")
                                     del model
                                     break
+
 
     stats_file.close()
 
@@ -319,8 +356,11 @@ def main(argv):
             full_path = full_path.replace("//", "/")  # remove double slashes when needed
             folder = full_path.split("/")[-2]
             dataset_folder = full_path
+            print(glob.glob("sample-dataset/*.hdf5"))
             X_train, Y_train = load_dataset(dataset_folder + "/*" + '-train.hdf5')
             X_val, Y_val = load_dataset(dataset_folder + "/*" + '-val.hdf5')
+           # X_train, Y_train = manual_load_dataset("sample-dataset/4t-10n-DOS2019-dataset-p4-train.hdf5")
+          #  X_val, Y_val = manual_load_dataset("sample-dataset/4t-10n-DOS2019-dataset-p4-val.hdf5")
 
             X_train, Y_train = shuffle(X_train, Y_train, random_state=SEED)
             X_val, Y_val = shuffle(X_val, Y_val, random_state=SEED)
@@ -366,7 +406,7 @@ def main(argv):
             filename = warm_up_file.split('/')[-1].strip()
             if filename_prefix in filename:
                 X, Y = load_dataset(warm_up_file)
-                Y_pred = np.squeeze(model.predict(X, batch_size=2048) > 0.5)
+                Y_pred = np.argmax(model.predict(X, batch_size=2048), axis=1)
 
             for dataset_file in dataset_filelist:
                 filename = dataset_file.split('/')[-1].strip()
@@ -379,7 +419,7 @@ def main(argv):
                     avg_time = 0
                     for iteration in range(iterations):
                         pt0 = time.time()
-                        Y_pred = np.squeeze(model.predict(X, batch_size=2048) > 0.5)
+                        Y_pred = np.argmax(model.predict(X, batch_size=2048), axis=1)
                         pt1 = time.time()
                         avg_time += pt1 - pt0
 
@@ -490,7 +530,7 @@ def main(argv):
 
                         X = np.expand_dims(X, axis=3)
                         pt0 = time.time()
-                        Y_pred = np.squeeze(model.predict(X, batch_size=2048) > 0.5,axis=1)
+                        Y_pred = np.argmax(model.predict(X, batch_size=2048), axis=1)
                         pt1 = time.time()
                         prediction_time = pt1 - pt0
                         [packets] = count_packets_in_dataset([X])
@@ -514,7 +554,7 @@ def main(argv):
 def report_results(Y_true, Y_pred,packets, model_name, dataset_filename, stats_file,prediction_time,process_time=0, 
     trasmission_time=0,packets_per_sample_sizes=0, avg_packets_in_registers_in_round=0, total_packet_captured_in_round=0, round_time=0, round_counter=0, packet_writer=0, short_header=False, switch_impl=None):
     
-    ddos_rate = '{:04.3f}'.format(sum(Y_pred)/Y_pred.shape[0])
+    ddos_rate = '{:04.3f}'.format(float(np.mean(Y_pred)))
 
     if short_header:
         time_string_predict = '{:05.3f}'.format(prediction_time)
