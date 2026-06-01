@@ -31,22 +31,60 @@ To bypass these hardware constraints and establish a rock-solid dev environment,
 
 ---
 
-### 🛠️ Core Technical Enhancements Implemented
+### 🛠️ Core Technical Enhancements Implemented (`lucid_cnn.py` vs `lucid_cnn1.py`)
 
-1. **Transition to Multi-Class Classification (`lucid_cnn.py`):**
-   * Upgraded the core prediction model from a simple binary setup (`Dense(1)` with Sigmoid) to support robust, multi-class/categorical network traffic classification (`Dense(2)` with Softmax).
-   * Integrated dynamic categorical formatting via Keras `to_categorical` parsing during training epochs to match the updated dense matrix dimension.
-   * Updated the optimization syntax by converting the outdated `lr` parameter inside the Adam optimizer to the modern `learning_rate` convention.
+#### 1. Docker Environment & M1/M2 Mac Compatibility Patch (Forced CPU Fallback)
+* **Original Code (`lucid_cnn1.py`):** Tried to dynamically allocate GPU memory, which explicitly triggers system core dumps and allocation crashes inside emulated container layers on ARM64 architectures:
+  ```python
+  # tf.config.experimental.set_memory_growth(tf.config.list_physical_devices('GPU')[0], True)
+  ```
+* **Our Patch (`lucid_cnn.py`):** Explicitly bypassed host GPU visibility, forcing a stable, crash-free CPU execution flow:
+  ```python
+  tf.config.set_visible_devices([], 'GPU')
+  ```
 
-2. **Docker Environment & M1/M2 Mac Compatibility Patch (`lucid_cnn.py`):**
-   * Resolved critical runtime crashes within Docker containers on ARM64 architectures (like Apple Silicon M1/M2) by explicitly bypassing host GPU visualization using `tf.config.set_visible_devices([], 'GPU')`, forcing a stable CPU execution.
+#### 2. Transition to Multi-Class Categorical Classification & Modern Keras Syntax
+* **Original Code (`lucid_cnn1.py`):** Restricted to binary classification using a single-neuron output dense layer, binary cross-entropy loss, and deprecated `lr` parameter syntax:
+  ```python
+  model.add(Dense(1, activation='sigmoid', name='fc1'))
+  optimizer = Adam(lr=lr, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
+  model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
+  ```
+* **Our Patch (`lucid_cnn.py`):** Upgraded the output layer architecture to support 2-class/categorical traffic tracking, adjusted the loss function, and updated the optimization syntax to comply with modern Keras standards:
+  ```python
+  model.add(Dense(2, activation='sigmoid', name='fc1'))
+  optimizer = Adam(learning_rate=lr, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
+  model.compile(loss="categorical_crossentropy", optimizer="adam", metrics=["accuracy"])
+  ```
 
-3. **Compiler Build Automation Fix (`p4c` TC Backend):**
-   * Patched `/app/p4c/backends/tc/CMakeLists.txt` by commenting out external repository fetching (`fetchcontent_makeavailable(iproute2repo)`).
-   * This guarantees seamless, offline-compatible compilation using localized system libraries, preventing the environment setup from hanging or failing due to connection issues.
+#### 3. One-Hot Data Engineering & Adaptive Prediction Parsing (`np.argmax`)
+* **Original Code (`lucid_cnn1.py`):** Parsed predictions statically based on a simple `0.5` binary threshold:
+  ```python
+  Y_pred_val = (best_model.predict(X_val) > 0.5)
+  ```
+* **Our Patch (`lucid_cnn.py`):** Embedded dynamic `to_categorical` parsing during compilation epochs. Integrated adaptive prediction parsing via `np.argmax` to extract peak class probability safely across varying tensor dimensions:
+  ```python
+  from tensorflow.keras.utils import to_categorical
+  num_classes = len(set(Y_train))
+  Y_train = to_categorical(Y_train, num_classes)
+  Y_val = to_categorical(Y_val, num_classes)
+  
+  # Adaptive parsing execution block
+  Y_pred_val = np.argmax(Y_pred_val, axis=1) if Y_pred_val.shape[1] > 1 else (Y_pred_val > 0.5).astype(int)
+  ```
 
-4. **Runtime Dependency Routing (`p4_util.py`):**
-   * Fixed missing execution paths and runtime import errors by explicitly appending system directories for `bm_runtime` and `bmpy_utils` via `sys.path`.
+#### 4. Localization & Logging Standardization
+Refactored the model's entire runtime logging and error-handling interface into clear English. Replaced native language constraints with standard terminal tracking for checkpoints (`Best model saved`), structural exception logging (`Error occurred while saving`), and ultimate state verification (`Model successfully saved`).
+
+---
+
+### 🔧 Compiler & Dependency Patches (External Submodules)
+
+1. **Compiler Build Automation Fix (`p4c` TC Backend):**
+   Patched `/app/p4c/backends/tc/CMakeLists.txt` by commenting out external repository fetching (`# fetchcontent_makeavailable(iproute2repo)`). This guarantees seamless, offline-compatible compilation using localized system libraries, preventing environment building from hanging.
+
+2. **Runtime Dependency Routing (`p4_util.py`):**
+   Fixed critical missing execution paths and runtime import exceptions by explicitly appending system directories for `bm_runtime` and `bmpy_utils` via `sys.path`.
 
 ---
 
