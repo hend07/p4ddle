@@ -1,38 +1,27 @@
-## Control Plane
+## Control Plane Setup & Experimentation
 
-### Setup
+### Parameter Configuration
+In the `experiment_**.sh` script, a few execution parameters must be configured before running the emulation suite:
+* The target PCAP files containing the attack data and benign traffic traces.
+* The explicit flow volume and benign number of packets per second.
+* The specific packet sampling rates (up to 1 in 16; higher rates require structural modification within the data plane P4 files).
+* The definitive test duration for each cross-combination of speed, sampling, and register sizing.
+* The exact name of your trained multi-class network weights (e.g., `latest_model.h5`).
 
-In file *experiment_**.sh* a few parameters have to be set:
-
-* the pcap files of the attacks and benign traces
-* the name and benign number of packets per second
-* the sampling rates (up to 1 on 16) if is required more you have to change the code in the p4 files.
-* the test duration per each combination of speed, sampling and the size of the registers
-* the name of the trained model
-
-In order to execute this operation with the help of the script, tcpreplay has to run without root permissions:
-```
+### Execution Permissions
+To allow the automated evaluation script to orchestrate traffic replay seamlessly without root privilege boundaries, update the executable permissions for `tcpreplay`:
+```bash
 sudo chmod a+s /usr/bin/tcpreplay
 ```
 
-This branch requires two additional packages. Activate the new ```python38``` environment:
+### 🧠 Modernized Dependency & Routing Layer (No Conda Required)
+Unlike the legacy documentation which restricted deployment to outdated Anaconda blocks (`python38`), our optimized repository standardizes execution on **Python 3.10 via native virtual environments (`venv`)**. 
 
-```
-conda activate python38
-```
+* **Automated Package Resolution:** Critical interaction modules such as `psutil` (for automated benchmarking orchestration) and `thrift` (for runtime switch controller communication) are already fully bundled and injected during our core environment setup stage.
+* **Automated API Routing Fix:** The historical constraint requiring manual code modification on line 2 of `p4_util.py` to prevent interpreter crashes has been **completely eliminated**. Our update embeds resilient directory mapping directly into the file execution header via dynamic `sys.path` appending, mapping external standard components seamlessly.
 
-And install new packages: psutil is required in order to automate the tests; thrift is required because we are now working in a conda environment
-
-```
-(python38)$ pip3 install psutil thrift
-```
-
-#### Include extra APIs
-The file ```p4_util.py``` at line 2 includes the extra APIs of the BMv2. They are installed in a folder that depends on your python version: check your python version and fix the path otherwise the script will crash.
-
-
-### Run
-To run the tests just run the script:
-```
-(python38)$ ./experiment_**.sh
+### Running the Experiments
+Once the shell configuration matches your target testing scenario, trigger the evaluation pipeline directly within your active environment:
+```bash
+./experiment_**.sh
 ```
