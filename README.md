@@ -121,5 +121,15 @@ python3 lucid_cnn.py --predict ./sample-dataset/ --model ./sample-dataset/latest
 
 ---
 
+### 📊 Experimental Results & Performance Evaluation
+
+The following charts illustrate the performance validation across different attack scenarios (DNS DDoS, UDP-Lag DDoS, and Mixed Traffic) within very short execution windows:
+
+![Metrics Comparison](imgs/metrics_comparison.png)
+
+*Note: As shown in the sub-second intervals, packet aggregation remains sparse initially, showcasing the system's baseline constraints before scaling up with extended monitoring periods.*
+
+---
+
 More details on the architecture of P4DDLe, its performance and experiments are available in the following research paper:
 *Doriguzzi-Corin, R., Knob, L. A. D., Mendozzi, L., Siracusa, D., and Savi, M. (2023). "Introducing packet-level analysis in programmable data planes to advance Network Intrusion Detection". *Computer Networks*, 110162.*
